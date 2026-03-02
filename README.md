@@ -106,11 +106,12 @@ Whether you're a defense consultant, enterprise executive, legal professional, o
 ### 🪟 **Windows**
 
 1. Download the latest `x64-setup.exe` from [Releases](https://github.com/Zackriya-Solutions/meeting-minutes/releases/latest)
-2. Run the installer
+2. Right-click the downloaded file → **Properties** → Check **Unblock** → Click **OK**
+3. Run the installer (if Windows shows a security warning: Click **More info** → **Run anyway**)
 
 ### 🍎 **macOS**
 
-1. Download `meetily_0.3.0_aarch64.dmg` from [Releases](https://github.com/Zackriya-Solutions/meeting-minutes/releases/latest)
+1. Download `meetily_0.2.0_aarch64.dmg` from [Releases](https://github.com/Zackriya-Solutions/meeting-minutes/releases/latest)
 2. Open the downloaded `.dmg` file
 3. Drag **Meetily** to your Applications folder
 4. Open **Meetily** from Applications folder

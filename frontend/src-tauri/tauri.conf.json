@@ -1,7 +1,7 @@
 {
     "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
     "productName": "meetily",
-    "version": "0.3.0",
+    "version": "0.2.0",
     "identifier": "com.meetily.ai",
     "build": {
         "frontendDist": "../out",
@@ -98,8 +98,7 @@
             "templates/*.json"
         ],
         "externalBin": [
-            "binaries/llama-helper",
-            "binaries/ffmpeg"
+            "binaries/llama-helper"
         ],
         "macOS": {
             "entitlements": "entitlements.plist",

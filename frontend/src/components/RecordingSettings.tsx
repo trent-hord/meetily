@@ -218,7 +218,7 @@ export function RecordingSettings({ onSave }: RecordingSettingsProps) {
         <div className="flex-1">
           <div className="font-medium">Recording Start Notification</div>
           <div className="text-sm text-gray-600">
-            Show reminder to inform participants when recording starts
+            Show legal notice reminder to inform participants when recording starts (US law compliance)
           </div>
         </div>
         <Switch

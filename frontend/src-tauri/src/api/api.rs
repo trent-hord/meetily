@@ -12,6 +12,7 @@ use crate::{
             transcript::TranscriptsRepository,
         },
     },
+    onboarding::load_onboarding_status,
     state::AppState,
     summary::CustomOpenAIConfig,
 };
@@ -465,7 +466,7 @@ pub async fn api_update_profile<R: Runtime>(
 
 #[tauri::command]
 pub async fn api_get_model_config<R: Runtime>(
-    _app: AppHandle<R>,
+    app: AppHandle<R>,
     state: tauri::State<'_, AppState>,
     _auth_token: Option<String>,
 ) -> Result<Option<ModelConfig>, String> {
@@ -635,7 +636,7 @@ pub async fn api_get_transcript_config<R: Runtime>(
             log_info!("No transcript config found, returning default.");
             Ok(Some(TranscriptConfig {
                 provider: "parakeet".to_string(),
-                model: crate::config::DEFAULT_PARAKEET_MODEL.to_string(),
+                model: "parakeet-tdt-0.6b-v3-int8".to_string(),
                 api_key: None,
             }))
         }
@@ -1336,10 +1337,7 @@ pub async fn api_test_custom_openai_connection<R: Runtime>(
                                         // Check if message.content field exists (can be empty string)
                                         let has_message_structure = first_choice
                                             .get("message")
-                                            .and_then(|m| {
-                                                m.get("content")
-                                                .or_else(|| m.get("reasoning_content"))
-                                            })
+                                            .and_then(|m| m.get("content"))
                                             .is_some();
 
                                         if has_message_structure {
@@ -1357,7 +1355,7 @@ pub async fn api_test_custom_openai_connection<R: Runtime>(
 
                         // Response was 200 but doesn't match OpenAI format
                         log_warn!("⚠️ Endpoint returned 200 but response doesn't match OpenAI format: {}", response_text);
-                        Err("Endpoint is reachable but doesn't appear to be OpenAI-compatible. Response is missing 'choices' array or 'message.content' / 'message.reasoning_content' field.".to_string())
+                        Err("Endpoint is reachable but doesn't appear to be OpenAI-compatible. Response is missing 'choices' array or 'message.content' field.".to_string())
                     }
                     Err(e) => {
                         log_warn!("⚠️ Endpoint returned 200 but response is not valid JSON: {}", e);

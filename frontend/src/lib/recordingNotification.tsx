@@ -2,9 +2,9 @@ import { toast } from 'sonner';
 import Analytics from '@/lib/analytics';
 
 /**
- * Shows the recording notification toast with compliance message.
+ * Shows the recording notification toast with legal compliance message.
  * Checks user preferences and displays a dismissible toast with:
- * - notice to inform participants
+ * - Legal notice to inform participants
  * - "Don't show again" checkbox
  * - Acknowledgment button
  *
@@ -23,7 +23,7 @@ export async function showRecordingNotification(): Promise<void> {
         description: (
           <div className="space-y-3 min-w-[280px]">
             <p className="text-sm font-medium text-gray-900">
-              Inform all participants this meeting is being recorded.
+              Legal Notice: Inform all participants this meeting is being recorded.
             </p>
             <label className="flex items-center gap-2 text-xs cursor-pointer hover:bg-blue-100 p-2 rounded transition-colors">
               <input

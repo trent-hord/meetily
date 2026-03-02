@@ -12,10 +12,6 @@ export interface ModelConfig {
   provider: 'ollama' | 'groq' | 'claude' | 'openrouter' | 'openai' | 'builtin-ai' | 'custom-openai';
   model: string;
   whisperModel: string;
-  /**
-   * @deprecated Use providerApiKeys from ConfigContext instead.
-   * This field may contain stale data when provider changes without saving.
-   */
   apiKey?: string | null;
   ollamaEndpoint?: string | null;
   // Custom OpenAI fields (only populated when provider is 'custom-openai')
@@ -39,6 +35,10 @@ export interface CustomOpenAIConfig {
 export interface RecordingPreferences {
   preferred_mic_device: string | null;
   preferred_system_device: string | null;
+}
+
+export interface LanguagePreference {
+  language: string;
 }
 
 /**
@@ -68,6 +68,14 @@ export class ConfigService {
    */
   async getRecordingPreferences(): Promise<RecordingPreferences> {
     return invoke<RecordingPreferences>('get_recording_preferences');
+  }
+
+  /**
+   * Get saved language preference
+   * @returns Promise with language code string
+   */
+  async getLanguagePreference(): Promise<string> {
+    return invoke<string>('get_language_preference');
   }
 
   /**
