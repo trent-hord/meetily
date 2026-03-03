@@ -64,8 +64,6 @@ impl VadEngine for WebRtcVad {
 
         Ok(result)
     }
-    }
-
     fn set_sensitivity(&mut self, sensitivity: VadSensitivity) {
         self.sensitivity = sensitivity;
     }
