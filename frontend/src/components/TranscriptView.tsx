@@ -104,6 +104,36 @@ function cleanStopWords(text: string): string {
   return cleanedText;
 }
 
+// Extract speaker ID from text format "[Speaker X] text"
+function extractSpeaker(text: string): { speaker: string | null, cleanText: string } {
+  if (!text) return { speaker: null, cleanText: text };
+  const match = text.match(/^\[Speaker ([^\]]+)\]\s*(.*)/i);
+  if (match) {
+    return { speaker: match[1], cleanText: match[2] };
+  }
+  return { speaker: null, cleanText: text };
+}
+
+// Speaker Badge Component
+const SpeakerBadge = ({ speaker }: { speaker: string }) => {
+  const hash = Array.from(speaker).reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const colors = [
+    'bg-blue-100 text-blue-800 border-blue-200', 
+    'bg-purple-100 text-purple-800 border-purple-200', 
+    'bg-green-100 text-green-800 border-green-200', 
+    'bg-amber-100 text-amber-800 border-amber-200', 
+    'bg-rose-100 text-rose-800 border-rose-200', 
+    'bg-indigo-100 text-indigo-800 border-indigo-200'
+  ];
+  const colorClass = colors[hash % colors.length];
+  
+  return (
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider font-semibold border mr-2 align-middle ${colorClass}`}>
+      Speaker {speaker}
+    </span>
+  );
+};
+
 export const TranscriptView: React.FC<TranscriptViewProps> = ({ transcripts, isRecording = false, isPaused = false, isProcessing = false, isStopping = false, enableStreaming = false }) => {
   const [speechDetected, setSpeechDetected] = useState(false);
 
@@ -269,9 +299,13 @@ export const TranscriptView: React.FC<TranscriptViewProps> = ({ transcripts, isR
         const originalWasEmpty = transcript.text.trim() === '';
         const displayText = originalWasEmpty && !isStreaming ? '[Silence]' : filteredText;
 
+        // Extract speaker from the raw text BEFORE fallback happens
+        const { speaker, cleanText } = extractSpeaker(displayText);
+
         // Sizer text: use cleaned version for proper sizing, fallback to [Silence] only if original was empty
         const sizerText = cleanStopWords(isStreaming ? streamingTranscript.fullText : transcript.text)
           || (originalWasEmpty && !isStreaming ? '[Silence]' : '');
+        const { cleanText: sizerCleanText } = extractSpeaker(sizerText);
 
         return (
           <motion.div
@@ -310,10 +344,12 @@ export const TranscriptView: React.FC<TranscriptViewProps> = ({ transcripts, isR
                   <div className="bg-gray-100 border border-gray-200 rounded-lg px-3 py-2">
                     <div className="relative">
                       <p className="text-base text-gray-800 leading-relaxed" style={{ visibility: 'hidden' }}>
-                        {sizerText}
+                        {speaker && <SpeakerBadge speaker={speaker} />}
+                        {sizerCleanText}
                       </p>
                       <p className="text-base text-gray-800 leading-relaxed absolute top-0 left-0">
-                        {displayText}
+                        {speaker && <SpeakerBadge speaker={speaker} />}
+                        {cleanText}
                       </p>
                     </div>
                   </div>
@@ -321,10 +357,12 @@ export const TranscriptView: React.FC<TranscriptViewProps> = ({ transcripts, isR
                   // Regular transcript - simple text
                   <div className="relative">
                     <p className="text-base text-gray-800 leading-relaxed" style={{ visibility: 'hidden' }}>
-                      {sizerText}
+                      {speaker && <SpeakerBadge speaker={speaker} />}
+                      {sizerCleanText}
                     </p>
                     <p className="text-base text-gray-800 leading-relaxed absolute top-0 left-0">
-                      {displayText}
+                      {speaker && <SpeakerBadge speaker={speaker} />}
+                      {cleanText}
                     </p>
                   </div>
                 )}

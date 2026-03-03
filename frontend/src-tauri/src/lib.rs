@@ -45,10 +45,13 @@ pub mod ollama;
 pub mod onboarding;
 pub mod openrouter;
 pub mod parakeet_engine;
+pub mod pyannote;
+pub mod segments;
 pub mod state;
 pub mod summary;
 pub mod tray;
 pub mod utils;
+pub mod vad_engine;
 pub mod whisper_engine;
 
 use audio::{list_audio_devices, AudioDevice, trigger_audio_permission};

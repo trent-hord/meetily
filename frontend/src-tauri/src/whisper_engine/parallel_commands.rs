@@ -172,28 +172,107 @@ pub async fn calculate_optimal_workers(
 pub async fn prepare_audio_chunks(
     audio_data: Vec<f32>,
     sample_rate: u32,
-    chunk_duration_ms: Option<f64>,
+    chunk_duration_ms: Option<f64>, // Ignored now since we segment by speaker natively
 ) -> Result<Vec<AudioChunk>, String> {
-    let duration_ms = chunk_duration_ms.unwrap_or(30000.0); // 30 seconds default
-    let samples_per_chunk = ((sample_rate as f64 * duration_ms) / 1000.0) as usize;
+    
+    // 1. Download Pyannote models
+    let embedding_model_path = match crate::pyannote::models::get_or_download_model(crate::pyannote::models::PyannoteModel::Embedding).await {
+        Ok(p) => p,
+        Err(e) => return Err(format!("Failed to get embedding model: {}", e)),
+    };
+    let segmentation_model_path = match crate::pyannote::models::get_or_download_model(crate::pyannote::models::PyannoteModel::Segmentation).await {
+        Ok(p) => p,
+        Err(e) => return Err(format!("Failed to get segmentation model: {}", e)),
+    };
+
+    // 2. Setup VAD Engine
+    let mut vad_engine: Box<dyn crate::vad_engine::VadEngine + Send> = Box::new(crate::vad_engine::WebRtcVad::new());
+    vad_engine.set_sensitivity(crate::vad_engine::VadSensitivity::Medium);
+    let vad_engine_arc = std::sync::Arc::new(tokio::sync::Mutex::new(vad_engine));
+
+    // 3. Setup Pyannote Extractors
+    let embedding_extractor = match crate::pyannote::embedding::EmbeddingExtractor::new(embedding_model_path.to_str().unwrap()) {
+        Ok(e) => std::sync::Arc::new(std::sync::Mutex::new(e)),
+        Err(e) => return Err(format!("Failed to create embedding extractor: {}", e)),
+    };
+
+    let embedding_manager = crate::pyannote::identify::EmbeddingManager::new(10); 
+
+    // 4. Extract Segments via Pyannote and VAD
+    let segments_result = crate::segments::prepare_segments(
+        &audio_data,
+        vad_engine_arc,
+        &segmentation_model_path,
+        embedding_manager, 
+        embedding_extractor,
+        "cpu"
+    ).await;
 
     let mut chunks = Vec::new();
     let mut chunk_id = 0;
 
-    for (i, chunk_samples) in audio_data.chunks(samples_per_chunk).enumerate() {
-        let start_time_ms = i as f64 * duration_ms;
-        let actual_duration_ms = (chunk_samples.len() as f64 / sample_rate as f64) * 1000.0;
+    match segments_result {
+        Ok((mut rx, _)) => {
+            while let Some(segment) = rx.recv().await {
+                // Segment is in 16khz right now according to segments.rs. But Pyannote segments
+                // already output what the audio rate was. `AudioChunk` takes data.
+                let chunk = AudioChunk {
+                    id: chunk_id,
+                    data: segment.samples.clone(),
+                    sample_rate: segment.sample_rate,
+                    start_time_ms: segment.start * 1000.0,
+                    duration_ms: (segment.end - segment.start) * 1000.0,
+                    speaker_id: Some(segment.speaker.clone()),
+                };
 
-        let chunk = AudioChunk {
-            id: chunk_id,
-            data: chunk_samples.to_vec(),
-            sample_rate,
-            start_time_ms,
-            duration_ms: actual_duration_ms,
-        };
+                chunks.push(chunk);
+                chunk_id += 1;
+            }
+        },
+        Err(e) => {
+            log::error!("Failed to run Pyannote segments: {:?}, falling back to blind generic chunks.", e);
+            // Fallback to simple slicing if completely failed
+            let duration_ms = chunk_duration_ms.unwrap_or(30000.0); // 30 seconds default
+            let samples_per_chunk = ((sample_rate as f64 * duration_ms) / 1000.0) as usize;
 
-        chunks.push(chunk);
-        chunk_id += 1;
+            for (i, chunk_samples) in audio_data.chunks(samples_per_chunk).enumerate() {
+                let start_time_ms = i as f64 * duration_ms;
+                let actual_duration_ms = (chunk_samples.len() as f64 / sample_rate as f64) * 1000.0;
+
+                let chunk = AudioChunk {
+                    id: chunk_id,
+                    data: chunk_samples.to_vec(),
+                    sample_rate,
+                    start_time_ms,
+                    duration_ms: actual_duration_ms,
+                    speaker_id: None,
+                };
+                chunks.push(chunk);
+                chunk_id += 1;
+            }
+        }
+    }
+
+    if chunks.is_empty() {
+        // Double fallback if Pyannote executed successfully but found ZERO speakers (utter silence or stripped)
+        let duration_ms = chunk_duration_ms.unwrap_or(30000.0);
+        let samples_per_chunk = ((sample_rate as f64 * duration_ms) / 1000.0) as usize;
+
+        for (i, chunk_samples) in audio_data.chunks(samples_per_chunk).enumerate() {
+            let start_time_ms = i as f64 * duration_ms;
+            let actual_duration_ms = (chunk_samples.len() as f64 / sample_rate as f64) * 1000.0;
+
+            let chunk = AudioChunk {
+                id: chunk_id,
+                data: chunk_samples.to_vec(),
+                sample_rate,
+                start_time_ms,
+                duration_ms: actual_duration_ms,
+                speaker_id: None,
+            };
+            chunks.push(chunk);
+            chunk_id += 1;
+        }
     }
 
     Ok(chunks)

@@ -336,12 +336,73 @@ pub async fn whisper_transcribe_audio(audio_data: Vec<f32>) -> Result<String, St
     };
 
     if let Some(engine) = engine {
-        // Get language preference
         let language = crate::get_language_preference_internal();
-        engine
-            .transcribe_audio(audio_data, language)
-            .await
-            .map_err(|e| format!("Transcription failed: {}", e))
+
+        // 1. Download Pyannote models
+        let embedding_model_path = match crate::pyannote::models::get_or_download_model(crate::pyannote::models::PyannoteModel::Embedding).await {
+            Ok(p) => p,
+            Err(e) => return Err(format!("Failed to get embedding model: {}", e)),
+        };
+        let segmentation_model_path = match crate::pyannote::models::get_or_download_model(crate::pyannote::models::PyannoteModel::Segmentation).await {
+            Ok(p) => p,
+            Err(e) => return Err(format!("Failed to get segmentation model: {}", e)),
+        };
+
+        // 2. Setup VAD Engine
+        let mut vad_engine: Box<dyn crate::vad_engine::VadEngine + Send> = Box::new(crate::vad_engine::WebRtcVad::new());
+        vad_engine.set_sensitivity(crate::vad_engine::VadSensitivity::Medium);
+        let vad_engine_arc = std::sync::Arc::new(tokio::sync::Mutex::new(vad_engine));
+
+        // 3. Setup Pyannote Extractors
+        let embedding_extractor = match crate::pyannote::embedding::EmbeddingExtractor::new(embedding_model_path.to_str().unwrap()) {
+            Ok(e) => std::sync::Arc::new(std::sync::Mutex::new(e)),
+            Err(e) => return Err(format!("Failed to create embedding extractor: {}", e)),
+        };
+
+        let embedding_manager = crate::pyannote::identify::EmbeddingManager::new(10); 
+
+        // 4. Extract Segments via Pyannote and VAD
+        let segments_result = crate::segments::prepare_segments(
+            &audio_data,
+            vad_engine_arc,
+            &segmentation_model_path,
+            embedding_manager, 
+            embedding_extractor,
+            "cpu"
+        ).await;
+
+        let mut final_transcript = String::new();
+        
+        match segments_result {
+            Ok((mut rx, _)) => {
+                while let Some(segment) = rx.recv().await {
+                    let transcribed_text = engine.transcribe_audio(segment.samples, language.clone())
+                        .await
+                        .unwrap_or_else(|_| "".to_string());
+                        
+                    let txt = transcribed_text.trim();
+                    if !txt.is_empty() {
+                        if !final_transcript.is_empty() {
+                            final_transcript.push('\n');
+                        }
+                        final_transcript.push_str(&format!("[Speaker {}] {}", segment.speaker, txt));
+                    }
+                }
+            },
+            Err(_) => {
+                // Ignore error, fallback below will catch empty string
+            }
+        }
+        
+        if final_transcript.is_empty() {
+            // Fallback for silence, mono-speakers completely stripped out, or prepare_segments failing entirely
+            engine
+                .transcribe_audio(audio_data, language)
+                .await
+                .map_err(|e| format!("Transcription failed: {}", e))
+        } else {
+            Ok(final_transcript)
+        }
     } else {
         Err("Whisper engine not initialized".to_string())
     }

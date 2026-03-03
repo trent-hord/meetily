@@ -15,6 +15,7 @@ pub struct AudioChunk {
     pub sample_rate: u32,
     pub start_time_ms: f64,
     pub duration_ms: f64,
+    pub speaker_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,6 +26,7 @@ pub struct TranscriptionResult {
     pub model_used: String,
     pub start_time_ms: f64,
     pub confidence_score: Option<f32>,
+    pub speaker_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -347,10 +349,16 @@ impl ParallelProcessor {
         let transcription_future = engine.transcribe_audio(chunk.data.clone(), language);
         let timeout_duration = tokio::time::Duration::from_secs(120); // 2 minute timeout per chunk
 
-        let text = tokio::time::timeout(timeout_duration, transcription_future)
+        let mut text = tokio::time::timeout(timeout_duration, transcription_future)
             .await
             .map_err(|_| anyhow!("Transcription timeout for chunk {}", chunk.id))?
             .map_err(|e| anyhow!("Transcription failed for chunk {}: {}", chunk.id, e))?;
+
+        if let Some(speaker) = &chunk.speaker_id {
+            if !text.trim().is_empty() {
+                text = format!("[Speaker {}] {}", speaker, text.trim());
+            }
+        }
 
         let processing_time = start_time.elapsed().as_millis() as u64;
 
@@ -361,6 +369,7 @@ impl ParallelProcessor {
             model_used: model_name.to_string(),
             start_time_ms: chunk.start_time_ms,
             confidence_score: None, // TODO: Add confidence scoring if available
+            speaker_id: chunk.speaker_id,
         };
 
         debug!("Worker {} completed chunk {} in {}ms",
