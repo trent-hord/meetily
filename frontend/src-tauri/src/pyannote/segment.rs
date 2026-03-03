@@ -148,11 +148,10 @@ impl SegmentIterator {
             .insert_axis(Axis(1))
             .to_owned();
 
-        let ort_outs = self
+        let (shape, data) = self
             .session
-            .run(ort::inputs![array.view()])
-            .context("Failed to run the session")?;
-        let (shape, data) = ort_outs.get("output")
+            .run(ort::inputs![array.view()]?)
+            .context("Failed to run the session")?
             .context("Output tensor not found")?
             .try_extract_tensor::<f32>()
             .context("Failed to extract tensor")?;
