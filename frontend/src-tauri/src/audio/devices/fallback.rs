@@ -18,6 +18,8 @@
 // User still hears via Bluetooth (playback uses default), but recording
 // captures via stable wired path (built-in mic + ScreenCaptureKit from built-in).
 
+#![allow(unused_imports)]
+
 use anyhow::Result;
 use log::{info, warn};
 

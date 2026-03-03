@@ -20,14 +20,14 @@ impl EmbeddingExtractor {
         let inputs = ort::inputs! ["feats" => features.view()]?;
 
         let ort_outs = self.session.run(inputs)?;
-        let ort_out = ort_outs
+        let (_, data) = ort_outs
             .get("embs")
             .context("Output tensor not found")?
             .try_extract_tensor::<f32>()
             .context("Failed to extract tensor")?;
 
         // Collect the tensor data into a Vec to own it
-        let embeddings: Vec<f32> = ort_out.iter().copied().collect();
+        let embeddings: Vec<f32> = data.iter().copied().collect();
 
         // Return an iterator over the Vec
         Ok(embeddings.into_iter())

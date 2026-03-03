@@ -1,6 +1,6 @@
 use crate::pyannote::session;
 use anyhow::{Context, Result};
-use ndarray::{ArrayViewD, Axis, IxDyn};
+use ndarray::{ArrayViewD, Axis};
 use std::{cmp::Ordering, path::Path, sync::Arc, sync::Mutex};
 
 use super::{embedding::EmbeddingExtractor, identify::EmbeddingManager};
@@ -152,11 +152,14 @@ impl SegmentIterator {
             .session
             .run(ort::inputs![array.view()])
             .context("Failed to run the session")?;
-        let ort_out = ort_outs.get("output").context("Output tensor not found")?;
-
-        let ort_out_tensor = ort_out
+        let (shape, data) = ort_outs.get("output")
+            .context("Output tensor not found")?
             .try_extract_tensor::<f32>()
             .context("Failed to extract tensor")?;
+
+        let shape_vec: Vec<usize> = shape.iter().map(|&x| x as usize).collect();
+        let ort_out_tensor = ndarray::ArrayViewD::from_shape(shape_vec, data)
+            .context("Failed to convert slice to ndarray")?;
 
         let mut result = None;
 
