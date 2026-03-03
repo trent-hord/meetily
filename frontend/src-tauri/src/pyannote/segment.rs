@@ -1,6 +1,6 @@
 use crate::pyannote::session;
 use anyhow::{Context, Result};
-use ndarray::{ArrayBase, Axis, IxDyn, ViewRepr};
+use ndarray::{ArrayViewD, Axis, IxDyn};
 use std::{cmp::Ordering, path::Path, sync::Arc, sync::Mutex};
 
 use super::{embedding::EmbeddingExtractor, identify::EmbeddingManager};
@@ -16,7 +16,7 @@ pub struct SpeechSegment {
     pub sample_rate: u32,
 }
 
-fn find_max_index(row: ArrayBase<ViewRepr<&f32>, IxDyn>) -> Result<usize> {
+fn find_max_index(row: ArrayViewD<'_, f32>) -> Result<usize> {
     let (max_index, _) = row
         .iter()
         .enumerate()
@@ -93,7 +93,7 @@ fn handle_new_segment(
 pub struct SegmentIterator {
     samples: Vec<f32>,
     sample_rate: u32,
-    session: ort::Session,
+    session: ort::session::Session,
     embedding_extractor: Arc<Mutex<EmbeddingExtractor>>,
     embedding_manager: EmbeddingManager,
     current_position: usize,
@@ -148,22 +148,23 @@ impl SegmentIterator {
             .insert_axis(Axis(1))
             .to_owned();
 
-        let inputs = ort::inputs![array].context("Failed to prepare inputs")?;
         let ort_outs = self
             .session
-            .run(inputs)
+            .run(ort::inputs![array.view()])
             .context("Failed to run the session")?;
         let ort_out = ort_outs.get("output").context("Output tensor not found")?;
 
-        let ort_out = ort_out
+        let ort_out_tensor = ort_out
             .try_extract_tensor::<f32>()
             .context("Failed to extract tensor")?;
 
         let mut result = None;
 
-        for row in ort_out.outer_iter() {
-            for sub_row in row.axis_iter(Axis(0)) {
-                let max_index = find_max_index(sub_row)?;
+        for row in ort_out_tensor.outer_iter() {
+            let row_view: ndarray::ArrayViewD<'_, f32> = row;
+            for sub_row in row_view.axis_iter(Axis(0)) {
+                let sub_row_view: ndarray::ArrayViewD<'_, f32> = sub_row;
+                let max_index = find_max_index(sub_row_view)?;
 
                 if max_index != 0 {
                     if !self.is_speeching {

@@ -1,7 +1,7 @@
 use crate::pyannote::session;
 use anyhow::{Context, Result};
 use ndarray::Array2;
-use ort::Session;
+use ort::session::Session;
 use std::path::Path;
 
 #[derive(Debug)]
