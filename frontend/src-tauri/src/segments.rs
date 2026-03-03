@@ -12,8 +12,6 @@ use anyhow::Result;
 use log::{error, info};
 use std::{path::PathBuf, sync::Arc, sync::Mutex as StdMutex};
 use tokio::sync::Mutex;
-use vad_rs::VadStatus;
-
 pub async fn prepare_segments(
     audio_data: &[f32],
     vad_engine: Arc<Mutex<Box<dyn VadEngine + Send>>>,
@@ -36,18 +34,14 @@ pub async fn prepare_segments(
         total_frames += 1;
 
         let mut new_chunk = chunk.to_vec();
-        let status = vad_engine.lock().await.audio_type(chunk);
-        match status {
-            Ok(VadStatus::Speech) => {
-                if let Ok(processed_audio) = spectral_subtraction(chunk, noise) {
-                    new_chunk = processed_audio;
-                    speech_frame_count += 1;
-                }
+        let is_speech = vad_engine.lock().await.is_voice_segment(chunk).unwrap_or(false);
+        if is_speech {
+            if let Ok(processed_audio) = spectral_subtraction(chunk, noise) {
+                new_chunk = processed_audio;
+                speech_frame_count += 1;
             }
-            Ok(VadStatus::Unknown) => {
-                noise = average_noise_spectrum(chunk);
-            }
-            _ => {}
+        } else {
+            noise = average_noise_spectrum(chunk);
         }
         audio_frames.extend(new_chunk);
     }

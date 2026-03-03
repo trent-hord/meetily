@@ -376,6 +376,7 @@ pub async fn whisper_transcribe_audio(audio_data: Vec<f32>) -> Result<String, St
         match segments_result {
             Ok((mut rx, _)) => {
                 while let Some(segment) = rx.recv().await {
+                    let string_speaker = segment.speaker.clone();
                     let transcribed_text = engine.transcribe_audio(segment.samples, language.clone())
                         .await
                         .unwrap_or_else(|_| "".to_string());
@@ -385,7 +386,7 @@ pub async fn whisper_transcribe_audio(audio_data: Vec<f32>) -> Result<String, St
                         if !final_transcript.is_empty() {
                             final_transcript.push('\n');
                         }
-                        final_transcript.push_str(&format!("[Speaker {}] {}", segment.speaker, txt));
+                        final_transcript.push_str(&format!("[Speaker {}] {}", string_speaker, txt));
                     }
                 }
             },
