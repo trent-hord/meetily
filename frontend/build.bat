@@ -88,7 +88,7 @@ if exist "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxi
     set "WindowsSDKIncludeVersion=10.0.22621.0"
     set "LIB=C:\Program Files (x86)\Windows Kits\10\Lib\10.0.22621.0\um\x64;C:\Program Files (x86)\Windows Kits\10\Lib\10.0.22621.0\ucrt\x64;%LIB%"
     set "INCLUDE=C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\um;C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\shared;C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt;%INCLUDE%"
-    set "PATH=C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64;%PATH%"
+    set "PATH=C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64;%USERPROFILE%\.cargo\bin;%PATH%"
 )
 echo Environment setup complete. Starting build...
 echo Final LIB path: %LIB%
