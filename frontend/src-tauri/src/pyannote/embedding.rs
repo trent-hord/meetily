@@ -1,7 +1,7 @@
 use crate::pyannote::session;
 use anyhow::{Context, Result};
-use ndarray::Array2;
 use ort::session::Session;
+use ort::value::TensorRef;
 use std::path::Path;
 
 #[derive(Debug)]
@@ -19,9 +19,7 @@ impl EmbeddingExtractor {
         let shape = knf_features.shape().to_vec();
         let features = ndarray::Array2::from_shape_vec((shape[0], shape[1]), knf_features.into_raw_vec()).unwrap();
         let features = features.insert_axis(ndarray::Axis(0)); // Add batch dimension
-        let inputs = ort::inputs! ["feats" => features.view()];
-
-        let ort_outs = self.session.run(inputs)?;
+        let ort_outs = self.session.run(ort::inputs!["feats" => TensorRef::from_array_view(features.view())?])?;
         let (_, data) = ort_outs
             .get("embs")
             .context("Output tensor not found")?
