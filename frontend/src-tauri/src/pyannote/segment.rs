@@ -1,6 +1,7 @@
 use crate::pyannote::session;
 use anyhow::{Context, Result};
 use ndarray::{ArrayViewD, Axis};
+use ort::value::TensorRef;
 use std::{cmp::Ordering, path::Path, sync::Arc, sync::Mutex};
 
 use super::{embedding::EmbeddingExtractor, identify::EmbeddingManager};
@@ -146,11 +147,12 @@ impl SegmentIterator {
             .insert_axis(Axis(0))
             .insert_axis(Axis(1));
 
-        let (shape, data) = self
+        let session_outputs = self
             .session
-            .run(ort::inputs![array.view()])
-            .context("Failed to run the session")?
-            .context("Output tensor not found")?
+            .run(ort::inputs![TensorRef::from_array_view(array.view())?])
+            .context("Failed to run the session")?;
+
+        let (shape, data) = session_outputs[0]
             .try_extract_tensor::<f32>()
             .context("Failed to extract tensor")?;
 
