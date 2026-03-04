@@ -86,7 +86,7 @@ fn main() {
     config
         .profile(profile)
         .very_verbose(std::env::var("CMAKE_VERBOSE").is_ok()) // Not verbose by default
-        .always_configure(false);
+        .always_configure(true); // Always reconfigure so MSVC CRT patches take effect
 
     // On Windows MSVC, force dynamic CRT (/MD) to match Rust's default.
     // Without this, cmake defaults to static CRT (/MT) for static libraries,

@@ -21,9 +21,37 @@ if(POLICY CMP0057)
   cmake_policy(SET CMP0057 NEW)
 endif()
 
+# Force dynamic CRT (/MD) on MSVC. Must be set before project().
+if(POLICY CMP0091)
+  cmake_policy(SET CMP0091 NEW)
+endif()
+if(MSVC)
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL"
+      CACHE STRING "MSVC runtime library" FORCE)
+endif()
+
 cmake_minimum_required(VERSION 3.3 FATAL_ERROR)
 
 project(kaldi-native-fbank CXX C)
+
+# Belt-and-suspenders: after project() re-initializes flags, replace /MT→/MD.
+if(MSVC)
+  foreach(_flag_var
+      CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
+      CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO
+      CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+      CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
+    if(DEFINED ${_flag_var})
+      string(REPLACE "/MT " "/MD " ${_flag_var} "${${_flag_var}}")
+      string(REPLACE "/MT\n" "/MD\n" ${_flag_var} "${${_flag_var}}")
+      string(REPLACE "/MTd " "/MDd " ${_flag_var} "${${_flag_var}}")
+      string(REPLACE "/MTd\n" "/MDd\n" ${_flag_var} "${${_flag_var}}")
+      string(REGEX REPLACE "/MT$" "/MD" ${_flag_var} "${${_flag_var}}")
+      string(REGEX REPLACE "/MTd$" "/MDd" ${_flag_var} "${${_flag_var}}")
+      set(${_flag_var} "${${_flag_var}}" CACHE STRING "" FORCE)
+    endif()
+  endforeach()
+endif()
 
 set(KALDI_NATIVE_FBANK_VERSION "1.20.0")
 
