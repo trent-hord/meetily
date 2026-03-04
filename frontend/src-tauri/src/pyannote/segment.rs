@@ -1,6 +1,6 @@
 use crate::pyannote::session;
 use anyhow::{Context, Result};
-use ndarray::{ArrayBase, Axis, IxDyn, ViewRepr};
+use ndarray::{ArrayViewD, Axis};
 use std::{cmp::Ordering, path::Path, sync::Arc, sync::Mutex};
 
 use super::{embedding::EmbeddingExtractor, identify::EmbeddingManager};
@@ -16,7 +16,7 @@ pub struct SpeechSegment {
     pub sample_rate: u32,
 }
 
-fn find_max_index(row: ArrayBase<ViewRepr<&f32>, IxDyn>) -> Result<usize> {
+fn find_max_index(row: ArrayViewD<'_, f32>) -> Result<usize> {
     let (max_index, _) = row
         .iter()
         .enumerate()
@@ -93,7 +93,7 @@ fn handle_new_segment(
 pub struct SegmentIterator {
     samples: Vec<f32>,
     sample_rate: u32,
-    session: ort::Session,
+    session: ort::session::Session,
     embedding_extractor: Arc<Mutex<EmbeddingExtractor>>,
     embedding_manager: EmbeddingManager,
     current_position: usize,
@@ -143,27 +143,28 @@ impl SegmentIterator {
     fn process_window(&mut self, window: &[f32]) -> Result<Option<SpeechSegment>> {
         let array = ndarray::Array1::from_vec(window.to_vec());
         let array = array
-            .view()
             .insert_axis(Axis(0))
-            .insert_axis(Axis(1))
-            .to_owned();
+            .insert_axis(Axis(1));
 
-        let inputs = ort::inputs![array].context("Failed to prepare inputs")?;
-        let ort_outs = self
+        let (shape, data) = self
             .session
-            .run(inputs)
-            .context("Failed to run the session")?;
-        let ort_out = ort_outs.get("output").context("Output tensor not found")?;
-
-        let ort_out = ort_out
+            .run(ort::inputs![array.view()])
+            .context("Failed to run the session")?
+            .context("Output tensor not found")?
             .try_extract_tensor::<f32>()
             .context("Failed to extract tensor")?;
 
+        let shape_vec: Vec<usize> = shape.iter().map(|&x| x as usize).collect();
+        let ort_out_tensor = ndarray::ArrayViewD::from_shape(shape_vec, data)
+            .context("Failed to convert slice to ndarray")?;
+
         let mut result = None;
 
-        for row in ort_out.outer_iter() {
-            for sub_row in row.axis_iter(Axis(0)) {
-                let max_index = find_max_index(sub_row)?;
+        for row in ort_out_tensor.outer_iter() {
+            let row_view: ndarray::ArrayViewD<'_, f32> = row;
+            for sub_row in row_view.axis_iter(Axis(0)) {
+                let sub_row_view: ndarray::ArrayViewD<'_, f32> = sub_row;
+                let max_index = find_max_index(sub_row_view)?;
 
                 if max_index != 0 {
                     if !self.is_speeching {

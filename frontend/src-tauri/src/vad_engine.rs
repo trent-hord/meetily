@@ -1,5 +1,5 @@
 use anyhow;
-use tracing::info;
+// use tracing::info;
 #[derive(Clone, Copy, Debug, Default)]
 pub enum VadSensitivity {
     Low,
@@ -64,6 +64,7 @@ impl VadEngine for WebRtcVad {
 
         Ok(result)
     }
+
     fn set_sensitivity(&mut self, sensitivity: VadSensitivity) {
         self.sensitivity = sensitivity;
     }
