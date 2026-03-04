@@ -143,14 +143,12 @@ impl SegmentIterator {
     fn process_window(&mut self, window: &[f32]) -> Result<Option<SpeechSegment>> {
         let array = ndarray::Array1::from_vec(window.to_vec());
         let array = array
-            .view()
             .insert_axis(Axis(0))
-            .insert_axis(Axis(1))
-            .to_owned();
+            .insert_axis(Axis(1));
 
         let (shape, data) = self
             .session
-            .run(ort::inputs![array.view()]?)
+            .run(ort::inputs![array.view()])
             .context("Failed to run the session")?
             .context("Output tensor not found")?
             .try_extract_tensor::<f32>()

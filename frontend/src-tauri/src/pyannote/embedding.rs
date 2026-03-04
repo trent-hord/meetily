@@ -15,9 +15,11 @@ impl EmbeddingExtractor {
         Ok(Self { session })
     }
     pub fn compute(&mut self, samples: &[f32]) -> Result<impl Iterator<Item = f32>> {
-        let features: Array2<f32> = knf_rs::compute_fbank(samples).map_err(anyhow::Error::msg)?;
-        let features = features.insert_axis(ndarray::Axis(0)).into_owned(); // Add batch dimension
-        let inputs = ort::inputs! ["feats" => features.view()]?;
+        let knf_features = knf_rs::compute_fbank(samples).map_err(anyhow::Error::msg)?;
+        let shape = knf_features.shape().to_vec();
+        let features = ndarray::Array2::from_shape_vec((shape[0], shape[1]), knf_features.into_raw_vec()).unwrap();
+        let features = features.insert_axis(ndarray::Axis(0)); // Add batch dimension
+        let inputs = ort::inputs! ["feats" => features.view()];
 
         let ort_outs = self.session.run(inputs)?;
         let (_, data) = ort_outs

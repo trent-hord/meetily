@@ -29,10 +29,8 @@ macro_rules! perf_trace {
 }
 
 // Make these macros available to other modules
-pub(crate) use perf_debug;
-pub(crate) use perf_trace;
-
-// Re-export async logging macros for external use (removed due to macro conflicts)
+// Removed pub(crate) use perf_debug/trace as they cause unused import warnings
+// Declared locally they are available via #[macro_use] or module paths if needed.
 
 // Declare audio module
 pub mod analytics;
